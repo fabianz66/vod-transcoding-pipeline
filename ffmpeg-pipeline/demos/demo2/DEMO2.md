@@ -30,12 +30,12 @@ Transcodes / ABR Ladder:
 To create a test raw video with FFMPEG:
 
 ```
-ffmpeg -f lavfi -i testsrc=duration=60:size=1280x720:rate=30 \
+ffmpeg -f lavfi -i testsrc=duration=60:size=1920x1080:rate=30 \
        -f lavfi -i "sine=frequency=500:duration=60,volume=-15dB" \
        -c:v libx264 -c:a aac h264_aac_720p_30fps.mp4
 ```     
 
-This create a 60s 720p video encoded in H264/AVC with AAC audio wrapped in an mp4 container.
+This create a 60s 1080p video encoded in H264/AVC with AAC audio wrapped in an mp4 container.
 
 ```
 sh transcode.sh

@@ -6,7 +6,7 @@
 # and generates DASH and HLS manifests sharing .m4s chunks.
 # ==============================================================================
 
-INPUT_FILE="h264_aac_720p_30fps.mp4"
+INPUT_FILE="h264_aac_1080p_30fps.mp4"
 
 # ------------------------------------------------------------------------------
 # 0. Dynamic Framerate & GOP Calculation
@@ -44,10 +44,10 @@ ffmpeg -y -i "$INPUT_FILE" \
 [v2]scale=-2:720[v2out]; \
 [v3]scale=-2:480[v3out]; \
 [v4]scale=-2:360[v4out]" \
--map "[v1out]" -c:v:0 libx264 -b:v:0 4500k -maxrate:v:0 4800k -bufsize:v:0 9000k -g "$GOP_SIZE" -keyint_min "$GOP_SIZE" -sc_threshold 0 -profile:v:0 main \
--map "[v2out]" -c:v:1 libx264 -b:v:1 2500k -maxrate:v:1 2700k -bufsize:v:1 5000k -g "$GOP_SIZE" -keyint_min "$GOP_SIZE" -sc_threshold 0 -profile:v:1 main \
--map "[v3out]" -c:v:2 libx264 -b:v:2 1200k -maxrate:v:2 1300k -bufsize:v:2 2400k -g "$GOP_SIZE" -keyint_min "$GOP_SIZE" -sc_threshold 0 -profile:v:2 main \
--map "[v4out]" -c:v:3 libx264 -b:v:3 700k  -maxrate:v:3 800k  -bufsize:v:3 1400k -g "$GOP_SIZE" -keyint_min "$GOP_SIZE" -sc_threshold 0 -profile:v:3 main \
+-map "[v1out]" -c:v:0 libx264 -b:v:0 4500k -maxrate:v:0 4800k -bufsize:v:0 9000k -g "$GOP_SIZE" -keyint_min "$GOP_SIZE" -sc_threshold 0 -flags +cgop -profile:v:0 main \
+-map "[v2out]" -c:v:1 libx264 -b:v:1 2500k -maxrate:v:1 2700k -bufsize:v:1 5000k -g "$GOP_SIZE" -keyint_min "$GOP_SIZE" -sc_threshold 0 -flags +cgop -profile:v:1 main \
+-map "[v3out]" -c:v:2 libx264 -b:v:2 1200k -maxrate:v:2 1300k -bufsize:v:2 2400k -g "$GOP_SIZE" -keyint_min "$GOP_SIZE" -sc_threshold 0 -flags +cgop -profile:v:2 main \
+-map "[v4out]" -c:v:3 libx264 -b:v:3 700k  -maxrate:v:3 800k  -bufsize:v:3 1400k -g "$GOP_SIZE" -keyint_min "$GOP_SIZE" -sc_threshold 0 -flags +cgop -profile:v:3 main \
 -map a:0 -c:a aac -b:a 128k -ar 44100 \
 -f dash -seg_duration "$SEG_DURATION" -use_timeline 1 -use_template 1 \
 -dash_segment_type mp4 \
@@ -96,10 +96,10 @@ ffmpeg -y -i "$INPUT_FILE" \
 [v2]scale=-2:720[v2out]; \
 [v3]scale=-2:480[v3out]; \
 [v4]scale=-2:360[v4out]" \
--map "[v1out]" -c:v:0 libsvtav1 -preset 8 -b:v:0 2200k -g "$GOP_SIZE" -keyint_min "$GOP_SIZE" \
--map "[v2out]" -c:v:1 libsvtav1 -preset 8 -b:v:1 1200k -g "$GOP_SIZE" -keyint_min "$GOP_SIZE" \
--map "[v3out]" -c:v:2 libsvtav1 -preset 8 -b:v:2 600k  -g "$GOP_SIZE" -keyint_min "$GOP_SIZE" \
--map "[v4out]" -c:v:3 libsvtav1 -preset 8 -b:v:3 350k  -g "$GOP_SIZE" -keyint_min "$GOP_SIZE" \
+-map "[v1out]" -c:v:0 libsvtav1 -preset 8 -svtav1-params open-gop=0 -b:v:0 2200k -g "$GOP_SIZE" -keyint_min "$GOP_SIZE" \
+-map "[v2out]" -c:v:1 libsvtav1 -preset 8 -svtav1-params open-gop=0 -b:v:1 1200k -g "$GOP_SIZE" -keyint_min "$GOP_SIZE" \
+-map "[v3out]" -c:v:2 libsvtav1 -preset 8 -svtav1-params open-gop=0 -b:v:2 600k  -g "$GOP_SIZE" -keyint_min "$GOP_SIZE" \
+-map "[v4out]" -c:v:3 libsvtav1 -preset 8 -svtav1-params open-gop=0 -b:v:3 350k  -g "$GOP_SIZE" -keyint_min "$GOP_SIZE" \
 -map a:0 -c:a aac -b:a 128k -ar 44100 \
 -f dash -seg_duration "$SEG_DURATION" -use_timeline 1 -use_template 1 \
 -dash_segment_type mp4 \
@@ -111,21 +111,10 @@ ffmpeg -y -i "$INPUT_FILE" \
 av1/manifest.mpd
 
 # ------------------------------------------------------------------------------
-# 4. Create Multi-Codec Master Manifests (HLS)
+# 4. Create Multi-Codec Master Manifests (HLS) and MPD.
 # ------------------------------------------------------------------------------
 echo "Stitching together Multi-Codec Master HLS Playlist..."
 
-MASTER_HLS="master.m3u8"
-echo "#EXTM3U" > "$MASTER_HLS"
-echo "#EXT-X-VERSION:6" >> "$MASTER_HLS"
-
-# Concatenate the variant streams from the three files, filtering out redundant headers
-# We use 'sed' to prepend the directory path so the master playlist knows exactly where to look
-grep -vE "^#EXTM3U|^#EXT-X-VERSION" h264/master.m3u8 | sed 's/media_/h264\/media_/g' >> "$MASTER_HLS"
-grep -vE "^#EXTM3U|^#EXT-X-VERSION" vp9/master.m3u8 | sed 's/media_/vp9\/media_/g' >> "$MASTER_HLS"
-grep -vE "^#EXTM3U|^#EXT-X-VERSION" av1/master.m3u8 | sed 's/media_/av1\/media_/g' >> "$MASTER_HLS"
-
-echo "Multi-codec HLS master playlist created at: $MASTER_HLS"
-echo "Note: DASH (.mpd) multi-codec merging requires XML parsing and is typically handled by Shaka Packager or Bento4."
+python3 merge_manifests.py
 
 echo "All ABR transcoding complete!"
