@@ -137,6 +137,7 @@ def merge_mpd(output='master.mpd'):
         period.remove(child)
 
     next_id = 0
+    video_ads_list = []
 
     # One video AdaptationSet per codec
     for codec in CODECS:
@@ -146,6 +147,15 @@ def merge_mpd(output='master.mpd'):
             ads.set('id', str(next_id))
             next_id += 1
             period.append(ads)
+            video_ads_list.append(ads)
+
+    # Link all video AdaptationSets so players can switch between codecs
+    video_ids = ','.join(a.get('id') for a in video_ads_list)
+    for ads in video_ads_list:
+        sp = ET.Element(tag('SupplementalProperty'))
+        sp.set('schemeIdUri', 'urn:mpeg:dash:adaptation-set-switching:2016')
+        sp.set('value', video_ids)
+        ads.insert(0, sp)
 
     # Single audio AdaptationSet from h264
     if base_audio:
